@@ -142,8 +142,8 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
               <h2 className="mb-4 text-xl font-semibold">In Progress</h2>
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {inProgressCourses.map((course) => (
-                  <Card key={course.enrollmentId} className="flex flex-col">
-                    <div className="aspect-video overflow-hidden rounded-t-lg">
+                  <Card key={course.enrollmentId} className="flex flex-col overflow-hidden pt-0">
+                    <div className="aspect-video overflow-hidden">
                       <CourseImage
                         src={course.coverImageUrl}
                         alt={course.courseTitle}
@@ -211,8 +211,8 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
               <h2 className="mb-4 text-xl font-semibold">Completed</h2>
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {completedCourses.map((course) => (
-                  <Card key={course.enrollmentId} className="flex flex-col">
-                    <div className="relative aspect-video overflow-hidden rounded-t-lg">
+                  <Card key={course.enrollmentId} className="flex flex-col overflow-hidden pt-0">
+                    <div className="relative aspect-video overflow-hidden">
                       <CourseImage
                         src={course.coverImageUrl}
                         alt={course.courseTitle}

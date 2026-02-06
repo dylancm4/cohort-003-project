@@ -118,11 +118,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {featuredCourses.map((course) => (
               <Link key={course.id} to={`/courses/${course.slug}`} className="group">
-                <Card className="h-full transition-shadow group-hover:shadow-md">
+                <Card className="h-full overflow-hidden pt-0 transition-shadow group-hover:shadow-md">
                   <CourseImage
                     src={course.coverImageUrl}
                     alt={course.title}
-                    className="aspect-video w-full rounded-t-lg object-cover"
+                    className="aspect-video w-full object-cover"
                   />
                   <CardHeader>
                     <h3 className="font-semibold leading-snug group-hover:text-primary">

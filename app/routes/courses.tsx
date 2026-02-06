@@ -149,8 +149,8 @@ export default function CourseCatalog({ loaderData }: Route.ComponentProps) {
               to={`/courses/${course.slug}`}
               className="group"
             >
-              <Card className="h-full transition-shadow group-hover:shadow-md">
-                <div className="aspect-video overflow-hidden rounded-t-lg">
+              <Card className="h-full overflow-hidden pt-0 transition-shadow group-hover:shadow-md">
+                <div className="aspect-video overflow-hidden">
                   <CourseImage
                     src={course.coverImageUrl}
                     alt={course.title}

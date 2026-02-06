@@ -166,8 +166,8 @@ export default function InstructorDashboard({
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => (
-            <Card key={course.id} className="flex flex-col">
-              <div className="aspect-video overflow-hidden rounded-t-lg">
+            <Card key={course.id} className="flex flex-col overflow-hidden pt-0">
+              <div className="aspect-video overflow-hidden">
                 <CourseImage
                   src={course.coverImageUrl}
                   alt={course.title}
