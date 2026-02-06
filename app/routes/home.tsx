@@ -1,23 +1,166 @@
+import { Link } from "react-router";
 import type { Route } from "./+types/home";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader } from "~/components/ui/card";
+import { buildCourseQuery, getLessonCountForCourse, getAllCategories } from "~/services/courseService";
+import { CourseStatus } from "~/db/schema";
+import { BookOpen, GraduationCap, Users, ArrowRight, User } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Ralph Course Platform" },
-    { name: "description", content: "A course platform for learning" },
+    { title: "Ralph — Learn at your own pace" },
+    { name: "description", content: "A modern course platform for developers. Browse courses, track your progress, and learn at your own pace." },
   ];
 }
 
-export default function Home() {
+export function loader() {
+  const courses = buildCourseQuery(null, null, CourseStatus.Published, "newest", 50, 0);
+  const featured = courses.slice(0, 3).map((course) => ({
+    ...course,
+    lessonCount: getLessonCountForCourse(course.id),
+  }));
+  const categories = getAllCategories();
+
+  return {
+    featuredCourses: featured,
+    totalCourses: courses.length,
+    totalCategories: categories.length,
+  };
+}
+
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const { featuredCourses, totalCourses, totalCategories } = loaderData;
+
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold">Ralph Course Platform</h1>
-        <p className="mt-4 text-lg text-muted-foreground">Coming soon</p>
-        <div className="mt-6">
-          <Button>Browse Courses</Button>
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <Link to="/" className="text-xl font-bold tracking-tight">
+            Ralph
+          </Link>
+          <nav className="flex items-center gap-6">
+            <Link
+              to="/courses"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Courses
+            </Link>
+            <Button asChild size="sm">
+              <Link to="/courses">Get Started</Link>
+            </Button>
+          </nav>
         </div>
-      </div>
-    </main>
+      </header>
+
+      <section className="mx-auto max-w-6xl px-6 py-24 text-center">
+        <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
+          Learn to code,
+          <br />
+          <span className="text-muted-foreground">at your own pace</span>
+        </h1>
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
+          Structured courses built by experienced instructors. Track your progress,
+          take quizzes, and build real-world skills.
+        </p>
+        <div className="mt-10 flex items-center justify-center gap-4">
+          <Button asChild size="lg">
+            <Link to="/courses">
+              Browse Courses
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-muted/50 py-16">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 sm:grid-cols-3">
+          <div className="text-center">
+            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-lg bg-primary/10">
+              <BookOpen className="size-6 text-primary" />
+            </div>
+            <p className="text-2xl font-bold">{totalCourses}</p>
+            <p className="text-sm text-muted-foreground">Available Courses</p>
+          </div>
+          <div className="text-center">
+            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-lg bg-primary/10">
+              <GraduationCap className="size-6 text-primary" />
+            </div>
+            <p className="text-2xl font-bold">{totalCategories}</p>
+            <p className="text-sm text-muted-foreground">Categories</p>
+          </div>
+          <div className="text-center">
+            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-lg bg-primary/10">
+              <Users className="size-6 text-primary" />
+            </div>
+            <p className="text-2xl font-bold">Self-paced</p>
+            <p className="text-sm text-muted-foreground">Learn on your schedule</p>
+          </div>
+        </div>
+      </section>
+
+      {featuredCourses.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-10 flex items-end justify-between">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">Featured Courses</h2>
+              <p className="mt-2 text-muted-foreground">
+                Start learning with our most popular courses
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link to="/courses">
+                View all
+                <ArrowRight className="ml-2 size-4" />
+              </Link>
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {featuredCourses.map((course) => (
+              <Link key={course.id} to={`/courses/${course.slug}`} className="group">
+                <Card className="h-full transition-shadow group-hover:shadow-md">
+                  {course.coverImageUrl ? (
+                    <img
+                      src={course.coverImageUrl}
+                      alt={course.title}
+                      className="aspect-video w-full rounded-t-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex aspect-video items-center justify-center rounded-t-lg bg-muted">
+                      <BookOpen className="size-10 text-muted-foreground/40" />
+                    </div>
+                  )}
+                  <CardHeader>
+                    <h3 className="font-semibold leading-snug group-hover:text-primary">
+                      {course.title}
+                    </h3>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {course.description}
+                    </p>
+                  </CardContent>
+                  <CardFooter className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <User className="size-3" />
+                      {course.instructorName ?? "Instructor"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="size-3" />
+                      {course.lessonCount} lessons
+                    </span>
+                  </CardFooter>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <footer className="border-t border-border py-8">
+        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-muted-foreground">
+          Ralph Course Platform
+        </div>
+      </footer>
+    </div>
   );
 }

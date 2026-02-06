@@ -10,11 +10,6 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { getAllUsers, getUserById } from "~/services/userService";
-import { getCurrentUserId } from "~/lib/session";
-import { DevUI } from "~/components/dev-ui";
-import { Sidebar } from "~/components/sidebar";
-import { Toaster } from "sonner";
 
 const darkModeScript = `
 (function() {
@@ -59,19 +54,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const users = getAllUsers();
-  const currentUserId = await getCurrentUserId(request);
-  const currentUser = currentUserId ? getUserById(currentUserId) : null;
-
-  return {
-    users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
-    currentUser: currentUser
-      ? { id: currentUser.id, name: currentUser.name, role: currentUser.role }
-      : null,
-  };
-}
-
 function NavigationLoadingBar() {
   const navigation = useNavigation();
   const isLoading = navigation.state === "loading";
@@ -86,19 +68,12 @@ function NavigationLoadingBar() {
   );
 }
 
-export default function App({ loaderData }: Route.ComponentProps) {
-  const { users, currentUser } = loaderData;
-
+export default function App() {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <>
       <NavigationLoadingBar />
-      <Sidebar currentUserRole={currentUser?.role ?? null} />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
-      <DevUI users={users} currentUser={currentUser} />
-      <Toaster position="bottom-right" richColors closeButton />
-    </div>
+      <Outlet />
+    </>
   );
 }
 
