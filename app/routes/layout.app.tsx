@@ -20,6 +20,7 @@ import {
 import { UserRole } from "~/db/schema";
 import { getTotalXp } from "~/services/xpService";
 import { getLevelFromXp } from "~/lib/leveling";
+import { getStreakData } from "~/services/streakService";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const users = getAllUsers();
@@ -59,7 +60,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       ? (() => {
           const totalXp = getTotalXp(currentUserId);
           const levelInfo = getLevelFromXp(totalXp);
-          return { ...levelInfo, totalXp };
+          const streak = getStreakData(currentUserId);
+          return { ...levelInfo, totalXp, ...streak };
         })()
       : null;
 

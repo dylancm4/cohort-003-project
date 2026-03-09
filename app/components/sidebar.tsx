@@ -17,6 +17,7 @@ import {
   LogOut,
   Settings,
   Star,
+  Flame,
 } from "lucide-react";
 import { NotificationBell } from "~/components/notification-bell";
 
@@ -51,6 +52,8 @@ interface GamificationData {
   currentLevelXp: number;
   xpForNextLevel: number;
   totalXp: number;
+  currentStreak: number;
+  longestStreak: number;
 }
 
 interface SidebarProps {
@@ -230,6 +233,16 @@ export function Sidebar({
                 {gamification.currentLevelXp} / {gamification.xpForNextLevel} XP
                 to next level
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Flame className="size-4 text-orange-500" />
+              <span className="text-sm font-medium">
+                {gamification.currentStreak} day
+                {gamification.currentStreak !== 1 ? "s" : ""}
+              </span>
+              <span className="ml-auto text-xs text-sidebar-foreground/50">
+                Best: {gamification.longestStreak}
+              </span>
             </div>
           </div>
         </div>
