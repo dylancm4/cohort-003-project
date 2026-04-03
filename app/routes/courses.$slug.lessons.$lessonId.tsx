@@ -67,19 +67,19 @@ import { cn, formatDuration } from "~/lib/utils";
 import { renderMarkdown } from "~/lib/markdown.server";
 import { YouTubePlayer } from "~/components/youtube-player";
 import { data, isRouteErrorResponse } from "react-router";
-import { z } from "zod";
+import * as v from "valibot";
 import { resolveCountry } from "~/lib/country.server";
 import { checkPppAccess, COUNTRIES } from "~/lib/ppp";
 import { findPurchase } from "~/services/purchaseService";
 import { parseFormData, parseParams } from "~/lib/validation";
 
-const lessonParamsSchema = z.object({
-  slug: z.string().min(1),
-  lessonId: z.coerce.number().int(),
+const lessonParamsSchema = v.object({
+  slug: v.pipe(v.string(), v.minLength(1)),
+  lessonId: v.pipe(v.unknown(), v.transform(Number), v.integer()),
 });
 
-const markCompleteSchema = z.object({
-  intent: z.literal("mark-complete"),
+const markCompleteSchema = v.object({
+  intent: v.literal("mark-complete"),
 });
 
 export function meta({ data: loaderData }: Route.MetaArgs) {
@@ -370,19 +370,20 @@ export async function action({ params, request }: Route.ActionArgs) {
       throw data("You must be enrolled to comment", { status: 403 });
     }
     const content = formData.get("content");
-    const parsed = z
-      .string()
-      .trim()
-      .min(1, "Comment cannot be empty")
-      .max(2000, "Comment is too long")
-      .safeParse(content);
+    const commentSchema = v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(1, "Comment cannot be empty"),
+      v.maxLength(2000, "Comment is too long")
+    );
+    const parsed = v.safeParse(commentSchema, content);
     if (!parsed.success) {
       return data(
-        { errors: { content: parsed.error.issues[0].message } },
+        { errors: { content: parsed.issues[0].message } },
         { status: 400 }
       );
     }
-    addComment(currentUserId, lessonId, parsed.data);
+    addComment(currentUserId, lessonId, parsed.output);
     return { success: true };
   }
 

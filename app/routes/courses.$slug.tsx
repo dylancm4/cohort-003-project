@@ -46,7 +46,7 @@ import { formatDuration, formatPrice } from "~/lib/utils";
 import { renderMarkdown } from "~/lib/markdown.server";
 import { resolveCountry } from "~/lib/country.server";
 import { calculatePppPrice, getCountryTierInfo } from "~/lib/ppp";
-import { z } from "zod";
+import * as v from "valibot";
 import { parseFormData } from "~/lib/validation";
 
 export function meta({ data: loaderData }: Route.MetaArgs) {
@@ -136,8 +136,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 }
 
-const reviewSchema = z.object({
-  rating: z.coerce.number().int().min(1).max(5),
+const reviewSchema = v.object({
+  rating: v.pipe(v.unknown(), v.transform(Number), v.integer(), v.minValue(1), v.maxValue(5)),
 });
 
 export async function action({ params, request }: Route.ActionArgs) {
