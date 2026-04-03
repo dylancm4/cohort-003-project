@@ -26,11 +26,26 @@ import {
   getBestAttempt,
 } from "~/services/quizService";
 import { computeResult } from "~/services/quizScoringService";
-import { LessonProgressStatus } from "~/db/schema";
+import {
+  addComment,
+  getVisibleComments,
+  getAllComments,
+  approveComment,
+  deleteComment,
+  getCommentById,
+} from "~/services/commentService";
+import {
+  toggleBookmark,
+  isLessonBookmarked,
+  getBookmarkedLessonIds,
+} from "~/services/bookmarkService";
+import { getUserById } from "~/services/userService";
+import { LessonProgressStatus, UserRole, CommentStatus } from "~/db/schema";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import {
   AlertTriangle,
+  Bookmark,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -45,6 +60,8 @@ import {
   XCircle,
   Trophy,
   RotateCcw,
+  MessageSquare,
+  Trash2,
 } from "lucide-react";
 import { cn, formatDuration } from "~/lib/utils";
 import { renderMarkdown } from "~/lib/markdown.server";
@@ -138,11 +155,22 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   let lastWatchPosition = 0;
   let watchProgress = 0;
   let lessonProgressMap: Record<number, string> = {};
+  let isBookmarked = false;
+  let bookmarkedLessonIds: number[] = [];
 
   if (currentUserId) {
     enrolled = isUserEnrolled(currentUserId, course.id);
 
     if (enrolled) {
+      isBookmarked = isLessonBookmarked({
+        userId: currentUserId,
+        lessonId,
+      });
+      bookmarkedLessonIds = getBookmarkedLessonIds({
+        userId: currentUserId,
+        courseId: course.id,
+      });
+
       // Mark lesson as in-progress when viewed
       markLessonInProgress(currentUserId, lessonId);
       const progress = getLessonProgress(currentUserId, lessonId);
@@ -189,6 +217,24 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     pppBlocked = pppResult.blocked;
     pppBlockedCountry = pppResult.blockedCountry;
     pppPurchaseCountry = pppResult.purchaseCountry;
+  }
+
+  // Determine moderator status and fetch comments
+  let isModerator = false;
+  let comments: ReturnType<typeof getAllComments> = [];
+  if (currentUserId) {
+    const currentUser = getUserById(currentUserId);
+    if (currentUser) {
+      isModerator =
+        (currentUser.role === UserRole.Instructor &&
+          course.instructorId === currentUserId) ||
+        currentUser.role === UserRole.Admin;
+    }
+    if (isModerator) {
+      comments = getAllComments(lessonId);
+    } else if (enrolled) {
+      comments = getVisibleComments(lessonId, currentUserId);
+    }
   }
 
   // Render lesson content from Markdown to HTML server-side
@@ -281,6 +327,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     pppBlocked,
     pppBlockedCountry,
     pppPurchaseCountry,
+    comments,
+    isModerator,
+    isBookmarked,
+    bookmarkedLessonIds,
   };
 }
 
@@ -302,6 +352,64 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   if (intent === "mark-complete") {
     markLessonComplete(currentUserId, lessonId);
+    return { success: true };
+  }
+
+  if (intent === "toggle-bookmark") {
+    const enrolled = isUserEnrolled(currentUserId, course.id);
+    if (!enrolled) {
+      throw data("You must be enrolled to bookmark", { status: 403 });
+    }
+    const result = toggleBookmark({ userId: currentUserId, lessonId });
+    return { success: true, bookmarked: result.bookmarked };
+  }
+
+  if (intent === "add-comment") {
+    const enrolled = isUserEnrolled(currentUserId, course.id);
+    if (!enrolled) {
+      throw data("You must be enrolled to comment", { status: 403 });
+    }
+    const content = formData.get("content");
+    const parsed = z
+      .string()
+      .trim()
+      .min(1, "Comment cannot be empty")
+      .max(2000, "Comment is too long")
+      .safeParse(content);
+    if (!parsed.success) {
+      return data(
+        { errors: { content: parsed.error.issues[0].message } },
+        { status: 400 }
+      );
+    }
+    addComment(currentUserId, lessonId, parsed.data);
+    return { success: true };
+  }
+
+  if (intent === "moderate-comment") {
+    const currentUser = getUserById(currentUserId);
+    const canModerate =
+      currentUser &&
+      ((currentUser.role === UserRole.Instructor &&
+        course.instructorId === currentUserId) ||
+        currentUser.role === UserRole.Admin);
+    if (!canModerate) {
+      throw data("Not authorized to moderate comments", { status: 403 });
+    }
+    const commentId = Number(formData.get("commentId"));
+    const action = formData.get("action");
+    if (isNaN(commentId) || (action !== "approve" && action !== "delete")) {
+      throw data("Invalid moderation request", { status: 400 });
+    }
+    const comment = getCommentById(commentId);
+    if (!comment || comment.lessonId !== lessonId) {
+      throw data("Comment not found", { status: 404 });
+    }
+    if (action === "approve") {
+      approveComment(commentId);
+    } else {
+      deleteComment(commentId);
+    }
     return { success: true };
   }
 
@@ -382,6 +490,10 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
     pppBlocked,
     pppBlockedCountry,
     pppPurchaseCountry,
+    comments,
+    isModerator,
+    isBookmarked,
+    bookmarkedLessonIds,
   } = loaderData;
   const [autoplay, toggleAutoplay] = useAutoplay();
   const fetcher = useFetcher({ key: `mark-complete-${lesson.id}` });
@@ -454,6 +566,7 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
         currentLessonId={lesson.id}
         lessonProgressMap={lessonProgressMap}
         enrolled={enrolled}
+        bookmarkedLessonIds={new Set(bookmarkedLessonIds)}
       />
 
       <div className="flex-1 p-6 lg:p-8">
@@ -502,6 +615,7 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
                 </Button>
               </a>
             )}
+            {enrolled && currentUserId && <BookmarkButton isBookmarked={isBookmarked} />}
           </div>
 
           {/* YouTube Video */}
@@ -592,6 +706,16 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
             </div>
           )}
 
+          {/* Comments Section */}
+          {(enrolled || isModerator) && currentUserId && (
+            <CommentSection
+              comments={comments}
+              isModerator={isModerator}
+              enrolled={enrolled}
+              lessonId={lesson.id}
+            />
+          )}
+
           {/* Prev/Next Navigation */}
           <div className="flex items-center justify-between border-t pt-6">
             {prevLesson ? (
@@ -645,12 +769,38 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
   );
 }
 
+function BookmarkButton({ isBookmarked }: { isBookmarked: boolean }) {
+  const fetcher = useFetcher({ key: "toggle-bookmark" });
+  const optimisticBookmarked =
+    fetcher.formData?.get("intent") === "toggle-bookmark"
+      ? !isBookmarked
+      : isBookmarked;
+
+  return (
+    <fetcher.Form method="post">
+      <input type="hidden" name="intent" value="toggle-bookmark" />
+      <Button variant="outline" size="sm" type="submit">
+        <Bookmark
+          className={cn(
+            "mr-1.5 size-4",
+            optimisticBookmarked
+              ? "fill-amber-500 text-amber-500"
+              : "text-muted-foreground"
+          )}
+        />
+        {optimisticBookmarked ? "Bookmarked" : "Bookmark"}
+      </Button>
+    </fetcher.Form>
+  );
+}
+
 function CurriculumSidebar({
   course,
   curriculum,
   currentLessonId,
   lessonProgressMap,
   enrolled,
+  bookmarkedLessonIds,
 }: {
   course: { id: number; title: string; slug: string };
   curriculum: Array<{
@@ -661,6 +811,7 @@ function CurriculumSidebar({
   currentLessonId: number;
   lessonProgressMap: Record<number, string>;
   enrolled: boolean;
+  bookmarkedLessonIds: Set<number>;
 }) {
   // Find which module the current lesson belongs to
   const currentModuleId = curriculum.find((m) =>
@@ -701,6 +852,9 @@ function CurriculumSidebar({
         <nav className="flex-1 p-2">
           {curriculum.map((mod) => {
             const isExpanded = expandedModules.has(mod.id);
+            const moduleHasBookmark = mod.lessons.some((l) =>
+              bookmarkedLessonIds.has(l.id)
+            );
 
             return (
               <div key={mod.id} className="mb-1">
@@ -715,6 +869,9 @@ function CurriculumSidebar({
                     )}
                   />
                   <span className="flex-1 text-left">{mod.title}</span>
+                  {moduleHasBookmark && (
+                    <Bookmark className="size-3.5 shrink-0 fill-amber-500 text-amber-500" />
+                  )}
                 </button>
 
                 {isExpanded && (
@@ -749,7 +906,10 @@ function CurriculumSidebar({
                             ) : (
                               <Circle className="size-3.5 shrink-0" />
                             )}
-                            <span className="truncate">{l.title}</span>
+                            <span className="flex-1 truncate">{l.title}</span>
+                            {bookmarkedLessonIds.has(l.id) && (
+                              <Bookmark className="size-3.5 shrink-0 fill-amber-500 text-amber-500" />
+                            )}
                           </Link>
                         </li>
                       );
@@ -762,6 +922,225 @@ function CurriculumSidebar({
         </nav>
       </div>
     </aside>
+  );
+}
+
+function formatRelativeTime(dateString: string) {
+  const now = Date.now();
+  const then = new Date(dateString).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return new Date(dateString).toLocaleDateString();
+}
+
+function CommentSection({
+  comments,
+  isModerator,
+  enrolled,
+  lessonId,
+}: {
+  comments: Array<{
+    id: number;
+    content: string;
+    status: string;
+    createdAt: string;
+    userId: number;
+    userName: string;
+    userAvatarUrl: string | null;
+  }>;
+  isModerator: boolean;
+  enrolled: boolean;
+  lessonId: number;
+}) {
+  const commentFetcher = useFetcher({ key: `add-comment-${lessonId}` });
+  const [commentText, setCommentText] = useState("");
+
+  const isSubmitting =
+    commentFetcher.state !== "idle" &&
+    commentFetcher.formData?.get("intent") === "add-comment";
+
+  useEffect(() => {
+    if (commentFetcher.data?.success && commentFetcher.state === "idle") {
+      setCommentText("");
+    }
+  }, [commentFetcher.data, commentFetcher.state]);
+
+  return (
+    <div className="mb-8">
+      <div className="mb-4 flex items-center gap-2">
+        <MessageSquare className="size-5 text-primary" />
+        <h2 className="text-xl font-semibold">Discussion</h2>
+        <span className="text-sm text-muted-foreground">
+          ({comments.length})
+        </span>
+      </div>
+
+      {/* Comment Form — only for enrolled students */}
+      {enrolled && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <commentFetcher.Form method="post">
+              <input type="hidden" name="intent" value="add-comment" />
+              <textarea
+                name="content"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Share your thoughts on this lesson..."
+                maxLength={2000}
+                rows={3}
+                className="mb-2 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              {commentFetcher.data?.errors?.content && (
+                <p className="mb-2 text-sm text-red-500">
+                  {commentFetcher.data.errors.content}
+                </p>
+              )}
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Your comment will be visible after instructor approval.
+                </p>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSubmitting || !commentText.trim()}
+                >
+                  {isSubmitting ? "Posting..." : "Post Comment"}
+                </Button>
+              </div>
+            </commentFetcher.Form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Comment List */}
+      {comments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No comments yet. Be the first to start a discussion!
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {comments.map((comment) => (
+            <CommentCard
+              key={comment.id}
+              comment={comment}
+              isModerator={isModerator}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommentCard({
+  comment,
+  isModerator,
+}: {
+  comment: {
+    id: number;
+    content: string;
+    status: string;
+    createdAt: string;
+    userId: number;
+    userName: string;
+    userAvatarUrl: string | null;
+  };
+  isModerator: boolean;
+}) {
+  const moderateFetcher = useFetcher({
+    key: `moderate-${comment.id}`,
+  });
+  const isPending = comment.status === CommentStatus.Pending;
+
+  return (
+    <Card
+      className={cn(isPending && "border-l-4 border-l-amber-400")}
+    >
+      <CardContent className="p-4">
+        <div className="mb-2 flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            {comment.userAvatarUrl ? (
+              <img
+                src={comment.userAvatarUrl}
+                alt={comment.userName}
+                className="size-7 rounded-full"
+              />
+            ) : (
+              <div className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                {comment.userName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="text-sm font-medium">{comment.userName}</span>
+            <span className="text-xs text-muted-foreground">
+              {formatRelativeTime(comment.createdAt)}
+            </span>
+            {isPending && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                Pending approval
+              </span>
+            )}
+          </div>
+
+          {isModerator && (
+            <div className="flex items-center gap-1">
+              {isPending && (
+                <moderateFetcher.Form method="post">
+                  <input
+                    type="hidden"
+                    name="intent"
+                    value="moderate-comment"
+                  />
+                  <input
+                    type="hidden"
+                    name="commentId"
+                    value={comment.id}
+                  />
+                  <input type="hidden" name="action" value="approve" />
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-green-600 hover:text-green-700"
+                  >
+                    <CheckCircle2 className="mr-1 size-3.5" />
+                    Approve
+                  </Button>
+                </moderateFetcher.Form>
+              )}
+              <moderateFetcher.Form method="post">
+                <input
+                  type="hidden"
+                  name="intent"
+                  value="moderate-comment"
+                />
+                <input
+                  type="hidden"
+                  name="commentId"
+                  value={comment.id}
+                />
+                <input type="hidden" name="action" value="delete" />
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-red-500 hover:text-red-600"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </moderateFetcher.Form>
+            </div>
+          )}
+        </div>
+
+        <p className="whitespace-pre-wrap text-sm">{comment.content}</p>
+      </CardContent>
+    </Card>
   );
 }
 

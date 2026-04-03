@@ -28,6 +28,11 @@ export enum TeamMemberRole {
   Member = "member",
 }
 
+export enum CommentStatus {
+  Pending = "pending",
+  Approved = "approved",
+}
+
 // ─── Tables ───
 
 export const users = sqliteTable("users", {
@@ -248,6 +253,34 @@ export const courseReviews = sqliteTable("course_reviews", {
     .notNull()
     .references(() => courses.id),
   rating: integer("rating").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const lessonComments = sqliteTable("lesson_comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  lessonId: integer("lesson_id")
+    .notNull()
+    .references(() => lessons.id),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  content: text("content").notNull(),
+  status: text("status").notNull().$type<CommentStatus>(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const lessonBookmarks = sqliteTable("lesson_bookmarks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  lessonId: integer("lesson_id")
+    .notNull()
+    .references(() => lessons.id),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
