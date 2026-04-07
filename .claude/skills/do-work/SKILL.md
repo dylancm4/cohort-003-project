@@ -19,8 +19,24 @@ If the task has not already been planned, create a plan for it.
 
 ## Step 3: Implement
 
-- Work through the plan step-by-step, marking tasks complete as you go.
-- Write tests for any `*-service.ts` files.
+Work through the plan step-by-step, marking tasks complete as you go.
+
+### Backend code (services, db, lib, server-side logic)
+
+Use red/green refactor, one test at a time in tracer-bullet style:
+
+1. **Red** — Write a single failing test for the next piece of behavior.
+2. **Green** — Write the minimal code to make that test pass.
+3. **Refactor** — Clean up while keeping the test green.
+4. Repeat from step 1 for the next behavior until the feature is complete.
+
+Do this for any `*-service.ts` files and other backend modules. Each cycle should
+cover one small, focused behavior — not the whole feature at once.
+
+### Frontend code (components, routes, UI)
+
+Implement directly without red/green refactor. Write the code, then validate in
+Step 4.
 
 ## Step 4: Validate
 

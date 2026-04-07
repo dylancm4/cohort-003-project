@@ -35,6 +35,7 @@ export enum CommentStatus {
 
 export enum NotificationType {
   Enrollment = "enrollment",
+  CouponRedemption = "coupon_redemption",
 }
 
 // ─── Tables ───
