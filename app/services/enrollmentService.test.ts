@@ -250,4 +250,60 @@ describe("enrollmentService", () => {
       expect(getCourseEnrolledStudents(base.course.id)).toHaveLength(0);
     });
   });
+
+  describe("enrollment notification integration", () => {
+    it("creates a notification for the instructor when a student enrolls", () => {
+      enrollUser(base.user.id, base.course.id, false, false);
+
+      const allNotifications = testDb
+        .select()
+        .from(schema.notifications)
+        .all();
+
+      const instructorNotifications = allNotifications.filter(
+        (n) => n.recipientUserId === base.instructor.id
+      );
+
+      expect(instructorNotifications).toHaveLength(1);
+      expect(instructorNotifications[0].type).toBe(
+        schema.NotificationType.Enrollment
+      );
+      expect(instructorNotifications[0].title).toBe("New Enrollment");
+      expect(instructorNotifications[0].message).toBe(
+        `${base.user.name} enrolled in ${base.course.title}`
+      );
+      expect(instructorNotifications[0].linkUrl).toBe(
+        `/instructor/${base.course.id}/students`
+      );
+      expect(instructorNotifications[0].isRead).toBe(false);
+    });
+
+    it("includes correct student name and course title in notification", () => {
+      const student2 = testDb
+        .insert(schema.users)
+        .values({
+          name: "Jane Smith",
+          email: "jane@example.com",
+          role: schema.UserRole.Student,
+        })
+        .returning()
+        .get();
+
+      enrollUser(student2.id, base.course.id, false, false);
+
+      const notifications = testDb
+        .select()
+        .from(schema.notifications)
+        .all();
+
+      const notification = notifications.find(
+        (n) => n.recipientUserId === base.instructor.id
+      );
+
+      expect(notification).toBeDefined();
+      expect(notification!.message).toBe(
+        `Jane Smith enrolled in ${base.course.title}`
+      );
+    });
+  });
 });

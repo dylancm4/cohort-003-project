@@ -33,6 +33,10 @@ export enum CommentStatus {
   Approved = "approved",
 }
 
+export enum NotificationType {
+  Enrollment = "enrollment",
+}
+
 // ─── Tables ───
 
 export const users = sqliteTable("users", {
@@ -281,6 +285,21 @@ export const lessonBookmarks = sqliteTable("lesson_bookmarks", {
   lessonId: integer("lesson_id")
     .notNull()
     .references(() => lessons.id),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const notifications = sqliteTable("notifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  recipientUserId: integer("recipient_user_id")
+    .notNull()
+    .references(() => users.id),
+  type: text("type").notNull().$type<NotificationType>(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  linkUrl: text("link_url").notNull(),
+  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

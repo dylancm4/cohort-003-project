@@ -43,6 +43,13 @@
       "when": 1775174601654,
       "tag": "0005_workable_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1775595653641,
+      "tag": "0006_tranquil_silk_fever",
+      "breakpoints": true
     }
   ]
 }

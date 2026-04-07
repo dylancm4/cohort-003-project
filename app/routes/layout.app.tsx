@@ -13,6 +13,11 @@ import {
 } from "~/services/progressService";
 import { getCountryTierInfo, COUNTRIES } from "~/lib/ppp";
 import { isTeamAdmin } from "~/services/teamService";
+import {
+  getNotifications,
+  getUnreadCount,
+} from "~/services/notificationService";
+import { UserRole } from "~/db/schema";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const users = getAllUsers();
@@ -46,6 +51,15 @@ export async function loader({ request }: Route.LoaderArgs) {
       })
     : [];
 
+  const isInstructor = currentUser?.role === UserRole.Instructor;
+  const notificationData =
+    isInstructor && currentUserId
+      ? {
+          unreadCount: getUnreadCount(currentUserId),
+          recent: getNotifications(currentUserId, 5, 0),
+        }
+      : null;
+
   return {
     users: users.map((u) => ({ id: u.id, name: u.name, role: u.role })),
     currentUser: currentUser
@@ -61,6 +75,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     countryTierInfo,
     countries: COUNTRIES,
     isTeamAdmin: currentUserId ? isTeamAdmin(currentUserId) : false,
+    notifications: notificationData,
   };
 }
 
@@ -73,6 +88,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     countryTierInfo,
     countries,
     isTeamAdmin: userIsTeamAdmin,
+    notifications: notificationData,
   } = loaderData;
 
   return (
@@ -81,6 +97,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
         currentUser={currentUser}
         recentCourses={recentCourses}
         isTeamAdmin={userIsTeamAdmin}
+        notifications={notificationData}
       />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
