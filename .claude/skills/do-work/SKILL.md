@@ -27,8 +27,8 @@ Use red/green refactor, one test at a time in tracer-bullet style:
 
 1. **Red** — Write a single failing test for the next piece of behavior.
 2. **Green** — Write the minimal code to make that test pass.
-3. **Refactor** — Clean up while keeping the test green.
-4. Repeat from step 1 for the next behavior until the feature is complete.
+3. **Repeat** — Repeat from step 1 for the next slice of behavior until the feature is complete.
+4. **Refactor** — Clean up while keeping the tests green.
 
 Do this for any `*-service.ts` files and other backend modules. Each cycle should
 cover one small, focused behavior — not the whole feature at once.
